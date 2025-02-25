@@ -1,6 +1,7 @@
 package com.my.japTest.jpaTest.repository;
 
 import com.my.japTest.jpaTest.constant.Gender;
+import com.my.japTest.jpaTest.dto.UserDto;
 import com.my.japTest.jpaTest.entity.Users;
 import jakarta.transaction.Transactional;
 import org.apache.catalina.User;
@@ -10,6 +11,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.annotation.Order;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 import java.time.LocalDate;
@@ -223,7 +227,7 @@ class UsersRepositoryTest {
     @Test
     @DisplayName("findByEmailLike")
     void findByEmailLike() {
-        usersRepository.findByEmailLike("%net%").forEach(x -> System.out.println(x));
+        System.out.println("결과 건수 : " + usersRepository.findByEmailLike("%net").stream().count());
     }
 
     @Test
@@ -232,21 +236,48 @@ class UsersRepositoryTest {
         LocalDate base = LocalDate.now().minusMonths(1L);
         LocalDateTime sta = base.atTime(0, 0, 0);
         LocalDateTime end = LocalDateTime.now();
-        System.out.println(sta + "" + end);
+        System.out.println(sta + " " + end);
         usersRepository.findByUpdatedAtBetweenAndNameStartingWith(sta, end, "j").forEach(x -> System.out.println(x));
+    }
+
+    @Test
+    @DisplayName("findTop10ByOrderByCreatedAtDesc")
+    void findTop10ByOrderByCreatedAtDesc() {
+        usersRepository.findTop10ByOrderByCreatedAtDesc()
+                .stream()
+                .map(x -> UserDto.fromEntity(x))
+                .toList()
+                .forEach(x -> System.out.println(x));
     }
 
     @Test
     @DisplayName("findByLikeColorAndGenderAndEmail")
     void findByLikeColorAndGender() {
-        usersRepository.findByLikeColorAndGender("Red", Gender.Male).forEach(x -> System.out.println(x));
+//        usersRepository.findByLikeColorAndGender("Red", Gender.Male)
+//                .stream().map(x -> x.getEmail().substring(0, x.getEmail().indexOf("@")))
+//                .forEach(x -> System.out.println(x));
+        List<Users> usersList = usersRepository.findByLikeColorAndGender("Red", Gender.Male);
+        for (Users userData : usersList) {
+            String result = userData.getEmail().substring(0, userData.getEmail().indexOf("@"));
+            System.out.println(result);
+
+        }
     }
 
     @Test
-    @DisplayName("findByUpdatedAtGreaterThanAndCreatedAt")
-    void findByUpdatedAtLessThanAndCreatedAt() {
-        LocalDateTime start = LocalDateTime.now();
-        usersRepository.findByUpdatedAtLessThanAndCreatedAt(start, start);
+    @DisplayName("findByUpdatedAt")
+    void findByUpdatedAt() {
+        usersRepository.findAll().stream()
+                .filter(x -> x.getUpdatedAt().isBefore(x.getCreatedAt()))
+                .toList()
+                .forEach(x -> System.out.println(x));
+    }
+
+    @Test
+    @DisplayName("findByGenderAndEmailContainsOrderByCreatedAtDesc")
+    void findByGenderAndEmailContainsOrderByCreatedAtDesc() {
+        usersRepository.findByGenderAndEmailContainsOrderByCreatedAtDesc(Gender.Female, "edu")
+                .forEach(x -> System.out.println(x));
     }
 
     @Test
@@ -257,9 +288,76 @@ class UsersRepositoryTest {
     }
 
     @Test
-    @DisplayName("findByLikeColorOrderByLikeColorAscNameDesc")
-    void findByLikeColorOrderByLikeColorAscNameDesc(){
-        usersRepository.findByLikeColorOrderByLikeColorAscNameDesc("Pink").forEach(x-> System.out.println(x));
+    @DisplayName("문제 8-1findByOrderByLikeColorAscNameDesc")
+    void findByOrderByLikeColorAscNameDesc() {
+        usersRepository.findByOrderByLikeColorAscNameDesc().forEach(x -> System.out.println(x));
     }
 
+    @Test
+    @DisplayName("문제 8-2findByOrderByLikeColorAscNameDesc")
+    void question_8_2() {
+        usersRepository.findAll(
+                Sort.by(
+                        Sort.Order.asc("likeColor"),
+                        Sort.Order.desc("name")
+                )
+        ).forEach(x -> System.out.println(x));
+
+    }
+
+    @Test
+    @DisplayName("findByLikeColorOrderByLikeColorAscNameDesc")
+    void findByLikeColorOrderByLikeColorAscNameDesc() {
+        usersRepository.findByLikeColorOrderByLikeColorAscNameDesc("Pink").forEach(x -> System.out.println(x));
+    }
+
+    @Test
+    @DisplayName("paging Test")
+//select * from users limit 5 offset 495 쿼리로는 이런느낌이다
+//    offset은 알아서 계산 해야한다
+    void pagingTest() {
+        System.out.println("페이지 : 0번째,페이지 당 리스트 수 : 10개");
+        usersRepository.findAll(
+                PageRequest.of(2, 5, Sort.by(Sort.Order.asc("name")))
+        ).forEach(x -> System.out.println(x));
+    }
+
+    @Test
+    @DisplayName("findByIdGreaterThenOrderByDesc")
+    void findByIdGreaterThanOrderByIdDesc() {
+        Pageable pageable = PageRequest.of(0, 5);
+        Page<Users> result = usersRepository.findByIdGreaterThanOrderByIdDesc(100L, pageable);
+        result.getContent().forEach(x -> System.out.println(x));
+
+        //총 페이지 수
+        System.out.println("총 페이지 수 : " + result.getTotalPages());
+        //전체 데이터 수
+        System.out.println("전체 데이터 수 : " + result.getTotalElements());
+        //현제 페이지 번호
+        System.out.println("현제 페이지 번호 : " + result.getNumber());
+        //페이지 당 데이터 수
+        System.out.println("페이지 사이즈 : " + result.getSize());
+        //다음페이지 존재 여부
+        System.out.println("다음 페이지 ? : " + result.hasNext());
+        //이전 페이지 존재 여부
+        System.out.println("이전 페이지 ? :" + result.hasPrevious());//이전 페이지가 있느냐? false
+        System.out.println("이전 페이지 ? :" + result.isFirst());// 내가 맨 앞이냐? 라는 말 그래서 true가 나옴
+        //
+    }
+
+    @Test
+    @DisplayName("9번")
+    void question_9() {
+        usersRepository.findAll(
+                PageRequest.of(0, 10, Sort.by(Sort.Order.desc("createdAt")))
+        ).forEach(x -> System.out.println(x));
+    }
+
+    @Test
+    @DisplayName("findByGenderOrderByIdDesc")
+    void findByGenderOrderByIdDesc() {
+        Pageable pageable = PageRequest.of(1, 3);
+        Page<Users> result = usersRepository.findByGenderOrderByIdDesc(Gender.Male, pageable);
+        result.getContent().forEach(x -> System.out.println(x));
+    }
 }
